@@ -8,6 +8,10 @@ from roadInfo import ensure_unique_road_name
 from trafficData import determine_traffic_intensities
 import tkinter as tk
 from trafficLightGUI import create_traffic_lights
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def submit(latitude_entry, longitude_entry, box_id_entry, range_entry, life_cycle_entry, max_snap_points_entry):
     latitude = float(latitude_entry.get())
@@ -78,14 +82,23 @@ def submit(latitude_entry, longitude_entry, box_id_entry, range_entry, life_cycl
     webbrowser.open(google_maps_url)
 
     # Get the nearest roads
-    snapped_points, num_roads = count_nearby_roads(latitude, longitude, API_KEY, range_m, max_snap_points=max_snap_points)
+    try:
+        snapped_points, num_roads = count_nearby_roads(latitude, longitude, API_KEY, range_m, max_snap_points=max_snap_points)
+    except Exception as e:
+        logging.error(f"Error fetching nearby roads: {str(e)}")
+        messagebox.showerror("Error", f"Failed to fetch nearby roads: {str(e)}")
+        return
 
     if num_roads > 0:
         road_names = []
         used_names = set()  # To keep track of used names
 
         for point in snapped_points:
-            road_name = get_road_name_or_landmark(point['location']['latitude'], point['location']['longitude'], API_KEY)
+            try:
+                road_name = get_road_name_or_landmark(point['location']['latitude'], point['location']['longitude'], API_KEY)
+            except Exception as e:
+                logging.error(f"Error getting road name for point {point}: {str(e)}")
+                road_name = f"Unknown Road {point['location']['latitude']}, {point['location']['longitude']}"
 
             # Ensure uniqueness
             road_name = ensure_unique_road_name(road_name, used_names)
@@ -97,7 +110,11 @@ def submit(latitude_entry, longitude_entry, box_id_entry, range_entry, life_cycl
         ui_labels = [f"Road {chr(65+i)}" for i in range(num_roads)]
 
         # Get traffic intensities for each road
-        traffic_intensities = determine_traffic_intensities(snapped_points, API_KEY)
+        try:
+            traffic_intensities = determine_traffic_intensities(snapped_points, API_KEY)
+        except Exception as e:
+            logging.error(f"Error determining traffic intensities: {str(e)}")
+            traffic_intensities = ["Unknown"] * num_roads
 
         # Print road details (name, coordinates, intensity) in the console with UI labels
         print(f"\nFound {num_roads} roads near the specified location:")
